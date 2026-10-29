@@ -5,18 +5,10 @@ import EmptyState from './components/states/EmptyState';
 import ErrorState from './components/states/ErrorState';
 import LoadingState from './components/states/LoadingState';
 import UnitToggle from './components/UnitToggle';
+import useWeather from './hooks/useWeather';
 import { formatTemperature } from './lib/temperature';
 import { getWeatherPresentation } from './lib/weatherCodes';
-import { mockWeatherData } from './mocks/weatherData';
-import type { RequestState, Unit, WeatherData } from './types/weather';
-
-function normalizeCityName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-}
+import type { Unit } from './types/weather';
 
 function formatForecastDate(date: string): string {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -32,31 +24,8 @@ function displayTemperature(value: number | undefined, unit: Unit): string {
 }
 
 export default function App() {
-  const [requestState, setRequestState] = useState<RequestState<WeatherData>>({ status: 'idle' });
+  const { status, data, error, search, retry } = useWeather();
   const [unit, setUnit] = useState<Unit>('celsius');
-  const [lastSearch, setLastSearch] = useState('');
-
-  function handleSearch(cityName: string) {
-    setLastSearch(cityName);
-    setRequestState({ status: 'loading' });
-
-    void Promise.resolve()
-      .then(() => {
-        if (normalizeCityName(cityName) !== normalizeCityName(mockWeatherData.city.name)) {
-          setRequestState({ status: 'empty', message: 'Nenhuma cidade encontrada' });
-          return;
-        }
-
-        setRequestState({ status: 'success', data: mockWeatherData });
-      })
-      .catch(() => {
-        setRequestState({
-          status: 'error',
-          kind: 'api',
-          message: 'Não foi possível carregar o clima. Tente novamente.',
-        });
-      });
-  }
 
   return (
     <div className="min-h-screen break-words bg-[linear-gradient(145deg,#1a2138_0%,#0b1020_42%,#11162a_100%)] text-white">
@@ -68,12 +37,12 @@ export default function App() {
             </span>
             <h1 className="font-sans text-lg font-semibold">Clima Agora</h1>
           </div>
-          <SearchBar onSearch={handleSearch} disabled={requestState.status === 'loading'} />
+          <SearchBar onSearch={search} disabled={status === 'loading'} />
           <UnitToggle unit={unit} onChange={setUnit} />
         </header>
 
         <section aria-label="Condições meteorológicas" className="grid gap-5">
-          {requestState.status === 'idle' && (
+          {status === 'idle' && (
             <div className="border-y border-white/10 py-10 sm:py-14">
               <p className="text-sm font-medium uppercase text-white/55">Clima local</p>
               <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">Qual é o tempo?</h2>
@@ -83,24 +52,28 @@ export default function App() {
             </div>
           )}
 
-          {requestState.status === 'loading' && <LoadingState />}
+          {status === 'loading' && <LoadingState />}
 
-          {requestState.status === 'empty' && (
-            <EmptyState title={requestState.message} hint="Confira o nome e tente outra busca." />
+          {status === 'empty' && (
+            <EmptyState
+              title={
+                data ? 'Previsão não disponível para esta cidade' : 'Nenhuma cidade encontrada'
+              }
+              hint={data ? data.city.name : 'Confira o nome e tente outra busca.'}
+            />
           )}
 
-          {requestState.status === 'error' && (
-            <ErrorState message={requestState.message} onRetry={() => handleSearch(lastSearch)} />
+          {status === 'error' && (
+            <ErrorState
+              message={error ?? 'Não foi possível carregar o clima. Tente novamente.'}
+              onRetry={retry}
+            />
           )}
 
-          {requestState.status === 'success' && (
+          {status === 'success' && data && (
             <>
-              {requestState.data.current && (
-                <CurrentWeather
-                  city={requestState.data.city}
-                  current={requestState.data.current}
-                  unit={unit}
-                />
+              {data.current && (
+                <CurrentWeather city={data.city} current={data.current} unit={unit} />
               )}
 
               <section
@@ -111,15 +84,15 @@ export default function App() {
                   <div>
                     <p className="text-sm font-medium uppercase text-white/60">Próximos dias</p>
                     <h2 id="forecast-heading" className="mt-1 text-xl font-semibold">
-                      Previsão em {requestState.data.city.name}
+                      Previsão em {data.city.name}
                     </h2>
                   </div>
                   <p className="text-sm text-white/60">5 dias</p>
                 </div>
 
-                {requestState.data.forecast.length > 0 ? (
+                {data.forecast.length > 0 ? (
                   <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                    {requestState.data.forecast.map((day) => {
+                    {data.forecast.map((day) => {
                       const presentation = getWeatherPresentation(day.weatherCode);
 
                       return (

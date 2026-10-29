@@ -1,5 +1,23 @@
 export type MetricUnit = '%' | 'km/h' | 'mm' | 'hPa';
 
+export function getDayLabel(date: string, index: number): string {
+  if (index === 0) return 'Hoje';
+  if (index === 1) return 'Amanhã';
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
+export function getShortDate(date: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
 export function formatMetric(value: number | undefined, unit: MetricUnit): string {
   if (value === undefined || !Number.isFinite(value)) return 'Não disponível';
 

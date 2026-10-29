@@ -23,14 +23,13 @@ describe('SearchBar', () => {
     expect(onSearch).toHaveBeenCalledWith('São Paulo');
   });
 
-  it('does not call onSearch for an empty or whitespace-only query', async () => {
+  it.each(['', '   '])('does not call onSearch for an empty query %j', async (query) => {
     const user = userEvent.setup();
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
 
-    const input = screen.getByRole('searchbox', { name: 'Cidade' });
-    await user.click(screen.getByRole('button', { name: 'Buscar' }));
-    await user.type(input, '   ');
+    const input = screen.getByLabelText('Cidade');
+    if (query) await user.type(input, query);
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
 
     expect(onSearch).not.toHaveBeenCalled();

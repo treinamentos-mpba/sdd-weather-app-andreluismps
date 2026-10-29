@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { formatMetric, formatReferenceTime } from '../../src/lib/format';
+import { formatMetric, formatReferenceTime, getDayLabel, getShortDate } from '../../src/lib/format';
+
+describe('getDayLabel', () => {
+  it.each([
+    ['2026-10-29', 0, 'Hoje'],
+    ['2026-10-30', 1, 'Amanhã'],
+    ['2026-10-31', 2, 'sábado'],
+    ['2026-11-01', 3, 'domingo'],
+    ['2026-11-02', 4, 'segunda-feira'],
+    ['2026-12-31', 2, 'quinta-feira'],
+    ['2027-01-01', 3, 'sexta-feira'],
+  ] as const)('labels %s at index %s as %s', (date, index, expected) => {
+    expect(getDayLabel(date, index)).toBe(expected);
+  });
+});
+
+describe('getShortDate', () => {
+  it.each([
+    ['2026-10-29', '29/10'],
+    ['2026-01-02', '02/01'],
+    ['2026-12-31', '31/12'],
+    ['2027-01-01', '01/01'],
+    ['2028-02-29', '29/02'],
+  ])('formats local forecast date %s as %s', (date, expected) => {
+    expect(getShortDate(date)).toBe(expected);
+  });
+});
 
 describe('format helpers', () => {
   it('formats weather metrics with Portuguese decimal separators and units', () => {
