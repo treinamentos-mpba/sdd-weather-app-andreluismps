@@ -7,7 +7,7 @@ Aplicação React de página única, organizada em quatro camadas simples, com d
 1. **Apresentação (`components/`):** componentes recebem dados/estados por props e comunicam ações por callbacks. Renderizam busca, clima atual, previsão e estados de loading/vazio/erro, preservando o tema Tailwind dark glassmorphism existente; não fazem `fetch`, não conhecem URLs e não mantêm regras de conversão.
 2. **Orquestração (`hooks/`):** `useWeather` mantém resultados da busca, cidade selecionada e estados de carregamento/erro; coordena os services e descarta respostas antigas quando a seleção muda. A unidade de apresentação permanece em estado React em memória, sem persistência.
 3. **Acesso a dados (`services/`):** `weatherService` é o único módulo que conhece URLs, parâmetros e payloads externos da Open-Meteo. Converte respostas para os tipos do domínio e normaliza falhas de rede, HTTP, timeout e payload inválido; não conhece componentes nem estado visual.
-4. **Funções puras (`lib/`):** conversão e arredondamento de temperatura, formatação, cálculo/validação de datas e mapeamento WMO para rótulos pt-BR. Não acessa rede, DOM, React ou estado global.
+4. **Funções puras (`lib/`):** conversão e arredondamento de temperatura, formatação, cálculo/validação de datas e mapeamento WMO para `{ label, icon }` em pt-BR. Não acessa rede, DOM, React ou estado global.
 
 `types/` contém contratos compartilhados, sem comportamento. Assim, cada camada pode ser testada isoladamente: componentes com props e interações simuladas; hooks com services mockados; services com `fetch` mockado; `lib` com entradas/saídas determinísticas. E2E valida fluxos integrados usando respostas de rede simuladas.
 
@@ -58,7 +58,7 @@ src/
     weatherService.ts        # geocoding e forecast Open-Meteo
   lib/
     temperature.ts           # conversão e arredondamento
-    weatherCodes.ts          # WMO -> rótulo pt-BR
+    weatherCodes.ts          # WMO -> rótulo pt-BR e ícone
     format.ts                # datas e números pt-BR
   types/
     weather.ts               # contratos de domínio e estados
@@ -92,7 +92,21 @@ export interface City {
 export interface CurrentWeather {
   temperatureC?: number; // `current.temperature_2m`, normalizada para Celsius.
   weatherCode?: number; // `current.weather_code`, código meteorológico WMO.
+  relativeHumidityPercent?: number; // `current.relative_humidity_2m`, em %.
+  windSpeedKmh?: number; // `current.wind_speed_10m`, em km/h.
+  precipitationMm?: number; // `current.precipitation`, em mm.
+  surfacePressureHpa?: number; // `current.surface_pressure`, em hPa.
   referenceTime?: string; // `current.time`, horário de referência da fonte.
+}
+
+export interface WeatherCodePresentation {
+  label: string; // Condição meteorológica em pt-BR.
+  icon: string; // Glifo decorativo associado ao código WMO.
+}
+
+export interface WeatherCodePresentation {
+  label: string; // Condição meteorológica em pt-BR.
+  icon: string; // Glifo visual decorativo associado ao código WMO.
 }
 
 export interface ForecastDay {
@@ -119,7 +133,7 @@ type RequestState<T> =
   | { status: 'error'; kind: RequestErrorKind; message: string };
 ```
 
-`weatherCode` usa os códigos WMO da fonte. Um código sem mapeamento é apresentado como “Condição não disponível”. `referenceTime` é o horário de referência/observação da fonte, nunca o horário de recebimento da resposta. Temperaturas internas permanecem em Celsius.
+`weatherCode` usa códigos WMO e `getWeatherPresentation(code)` retorna `WeatherCodePresentation`; um código sem mapeamento usa “Condição não disponível” e um ícone genérico. O ícone é decorativo (`aria-hidden`); o rótulo dá o nome acessível da condição. `referenceTime` é o horário de referência/observação da fonte, nunca o horário de recebimento da resposta. Temperaturas internas permanecem em Celsius.
 
 Invariantes: busca retorna no máximo cinco cidades; uma cidade selecionada identifica todo `WeatherData`; o forecast contém exatamente hoje e os quatro dias seguintes no timezone da cidade; unidade não é persistida; códigos/dados opcionais nunca são convertidos em valores fictícios.
 
@@ -205,11 +219,13 @@ Mapeamento para `City`: `id`, `name`, `admin1`, `country`, `latitude` e `longitu
 | Parâmetro | Valor/contrato |
 |---|---|
 | `latitude`, `longitude` | Coordenadas da `City` selecionada. |
-| `current` | `temperature_2m,weather_code`; `time` é retornado como referência temporal do bloco `current`. |
+| `current` | `temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation,surface_pressure,weather_code`; `time` é retornado como referência temporal do bloco `current`. |
 | `daily` | `weather_code,temperature_2m_min,temperature_2m_max`. |
 | `forecast_days` | `5`: hoje e os quatro dias seguintes. |
 | `timezone` | `auto`, para usar o fuso local inferido a partir das coordenadas. |
 | `temperature_unit` | `celsius`, base canônica do domínio. |
+| `wind_speed_unit` | `kmh`, para produzir velocidade em km/h. |
+| `precipitation_unit` | `mm`, para produzir precipitação em milímetros. |
 
 Exemplo resumido de resposta bem-sucedida:
 
@@ -221,6 +237,10 @@ Exemplo resumido de resposta bem-sucedida:
   "current": {
     "time": "2026-10-29T12:00",
     "temperature_2m": 14.2,
+    "relative_humidity_2m": 56,
+    "wind_speed_10m": 12.3,
+    "precipitation": 0.1,
+    "surface_pressure": 1015.2,
     "weather_code": 3
   },
   "daily": {
@@ -236,9 +256,9 @@ Mapeamento para os tipos do domínio:
 
 - `WeatherData.city`: a `City` selecionada que originou a requisição.
 - `WeatherData.timezone`: resposta `timezone`.
-- `WeatherData.current.temperatureC`: `current.temperature_2m`; `weatherCode`: `current.weather_code`; `referenceTime`: `current.time`.
+- `WeatherData.current.temperatureC`: `current.temperature_2m`; `weatherCode`: `current.weather_code`; `relativeHumidityPercent`: `current.relative_humidity_2m`; `windSpeedKmh`: `current.wind_speed_10m`; `precipitationMm`: `current.precipitation`; `surfacePressureHpa`: `current.surface_pressure`; `referenceTime`: `current.time`.
 - Cada `ForecastDay.date`: data esperada no timezone retornado; localizar o índice correspondente em `daily.time` e mapear `weather_code`, `temperature_2m_min` e `temperature_2m_max` por essa data, não por posição deslocável do array.
-- `weatherCode` é um código WMO, traduzido localmente para pt-BR. Não solicitar campo de texto de condição à API.
+- `weatherCode` é traduzido localmente por `getWeatherPresentation` para rótulo e ícone. Não solicitar campo de texto de condição à API.
 
 Construir primeiro as cinco datas esperadas (hoje e os quatro dias seguintes) usando o timezone retornado pela API; indexar `daily.time` por data e fazer merge nessa sequência. Se uma data ou campo não vier, manter a posição e marcar seus valores como indisponíveis, sem deslocar dados de dias seguintes nem inventar valores. `timezone=auto` e `daily.time` definem as datas locais; não reinterpretar as datas no fuso do navegador.
 
@@ -276,8 +296,8 @@ Ao selecionar outra cidade, não apresentar dados anteriores como se fossem da n
 
 ## Testing Strategy
 
-- **Funções puras (Vitest):** cobrir conversão C/F, arredondamento (incluindo valores negativos e empates), mapeamento de códigos WMO conhecidos/desconhecidos e formatação de datas/números em pt-BR e timezone da cidade.
-- **Services (Vitest + `fetch` mockado):** verificar URLs e parâmetros de geocoding/forecast, até cinco resultados, `language=pt`, cinco dias, `timezone=auto`, Celsius, ausência de `apikey` e `customer-`, mapeamento dos payloads, caracteres especiais, resposta vazia/parcial, lacuna em data intermediária, erro HTTP/rede e timeout de 10 segundos. Não chamar serviços reais.
+- **Funções puras (Vitest):** cobrir conversão C/F, arredondamento (incluindo valores negativos e empates), rótulos/ícones WMO conhecidos/desconhecidos e formatação de datas/números em pt-BR e timezone da cidade.
+- **Services (Vitest + `fetch` mockado):** verificar URLs e parâmetros de geocoding/forecast, até cinco resultados, `language=pt`, variáveis do clima atual incluindo umidade/vento/precipitação/pressão, unidades `kmh`/`mm`, cinco dias, `timezone=auto`, Celsius, ausência de `apikey` e `customer-`, mapeamento dos payloads, caracteres especiais, resposta vazia/parcial, lacuna em data intermediária, erro HTTP/rede e timeout de 10 segundos. Não chamar serviços reais.
 - **Hooks e componentes (Vitest + Testing Library):** testar os estados `idle`, `loading`, `success`, `empty` e `error`; busca e seleção; dados atuais e cinco resumos; campos/dias parciais; estado desatualizado; retry; troca rápida de cidade/respostas fora de ordem; alternância de unidade sem nova chamada. Verificar por roles/labels e se loading/erro são anunciados por tecnologia assistiva.
 - **Playwright (E2E):** interceptar todas as rotas Open-Meteo com respostas determinísticas. Cobrir o fluxo busca → seleção → clima atual/previsão → alternância; busca vazia/sem resultados; geocoding e forecast indisponíveis; resposta parcial com uma data intermediária ausente; timeout e retry. Rodar nos viewports 320 × 568 e 1280 × 720 e nas combinações de navegador/plataforma de NFR-05. Nunca depender da API real.
 - **NFRs:** automatizar verificações de responsividade e acessibilidade; medir o NFR-03 com resposta simulada instantânea em 20 execuções por fluxo; validar manualmente o uso com leitor de tela conforme NFR-02/NFR-09.

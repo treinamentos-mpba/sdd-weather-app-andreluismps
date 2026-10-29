@@ -31,7 +31,7 @@ As personas abaixo são perfis-alvo do MVP, derivados do briefing e não apresen
 ## Requisitos Funcionais
 
 - **RF-01 — Buscar cidades:** permitir que o usuário pesquise cidades.
-- **RF-02 — Consultar clima atual:** exibir as condições meteorológicas atuais da cidade selecionada.
+- **RF-02 — Consultar clima atual:** exibir temperatura, condição com rótulo/ícone, horário de referência, umidade relativa (%), vento (km/h), precipitação (mm) e pressão de superfície (hPa) da cidade selecionada.
 - **RF-03 — Consultar previsão:** exibir uma previsão do tempo para cinco dias.
 - **RF-04 — Alternar unidades:** permitir alternar entre Celsius e Fahrenheit.
 - **RF-05 — Informar falhas de consulta:** informar ao usuário quando não for possível carregar os dados meteorológicos, por exemplo, devido a uma falha de conexão ou indisponibilidade da fonte.
@@ -96,7 +96,7 @@ Estimativas iniciais; revisar probabilidade e impacto após responder às pergun
     Justificativa: oferece seleção explícita e limita a lista de resultados.  
     Resolve: define regiões conforme a cobertura do provedor, interação, limite de resultados e dados de desambiguação (região/país; coordenadas como fallback).
 
-8. **Contrato mínimo de dados:** clima atual inclui temperatura, condição e horário de referência; cada resumo diário inclui data, condição, mínima e máxima. Condições são rotuladas em pt-BR; código sem rótulo conhecido usa “Condição não disponível”.  
+8. **Contrato mínimo de dados:** clima atual inclui temperatura, condição, horário de referência, umidade relativa, velocidade do vento, precipitação e pressão de superfície; cada resumo diário inclui data, condição, mínima e máxima. Condições são rotuladas em pt-BR e têm ícone correspondente; código sem rótulo conhecido usa “Condição não disponível” e ícone genérico.  
     Justificativa: torna o conteúdo mínimo estável para interface e aceitação.  
     Resolve: define campos mínimos e comportamento para condição desconhecida.
 
@@ -170,7 +170,7 @@ As perguntas abaixo registram as incertezas originais do discovery. As decisões
 
 - A busca é enviada manualmente, cobre as localidades indexadas pelo provedor e apresenta até cinco resultados.
 - A cidade selecionada será a referência para exibir o clima atual e a previsão.
-- O mínimo de dados é temperatura, condição e horário de referência no clima atual; condição, mínima e máxima em cada resumo diário.
+- O mínimo de dados é temperatura, condição, horário de referência, umidade relativa, vento, precipitação e pressão de superfície no clima atual; condição, mínima e máxima em cada resumo diário.
 - Celsius é a unidade padrão e Fahrenheit também pode ser selecionado.
 - Os dados meteorológicos serão obtidos exclusivamente dos endpoints públicos da Open-Meteo, sem API key e sem chamadas a recursos com prefixo `customer-`.
 - O uso dos endpoints públicos em produção depende da comprovação dos termos, cobertura, cotas e atribuição especificados em NFR-10.

@@ -11,7 +11,7 @@ Camila e Marcos são personas-alvo adotadas para delimitar o MVP a partir do bri
 ## Functional Requirements
 
 - **FR-01 — Buscar e selecionar cidade:** o usuário deve poder enviar manualmente uma busca pelo nome de uma localidade em qualquer país indexado pelo provedor e selecionar um dos até cinco resultados retornados. A busca não faz sugestões enquanto a pessoa digita.
-- **FR-02 — Consultar clima atual:** após selecionar uma cidade, o usuário deve poder ver temperatura, condição meteorológica rotulada em pt-BR e horário de referência/observação retornado pela fonte para essa localidade.
+- **FR-02 — Consultar clima atual:** após selecionar uma cidade, o usuário deve poder ver temperatura, condição meteorológica rotulada em pt-BR com ícone correspondente, umidade relativa (%), velocidade do vento (km/h), precipitação (mm), pressão de superfície (hPa) e horário de referência/observação retornado pela fonte.
 - **FR-03 — Consultar previsão de cinco dias:** o usuário deve poder ver resumos diários de hoje e dos quatro dias seguintes, no fuso horário local da cidade selecionada, com data, condição rotulada em pt-BR e temperaturas mínima e máxima.
 - **FR-04 — Alternar unidade de temperatura:** o usuário deve poder alternar entre Celsius e Fahrenheit; Celsius é a unidade inicial.
 - **FR-05 — Informar e recuperar falhas de consulta:** se a busca ou os dados meteorológicos não puderem ser carregados, o sistema deve informar o usuário e oferecer uma ação explícita para tentar novamente.
@@ -61,9 +61,9 @@ Cada critério usa Given/When/Then e deve ser validado com respostas de teste de
 ### FR-02 — Consultar clima atual
 
 - **AC-02.1 — Dados atuais carregados**
-  - **Given** uma cidade está selecionada e a fonte retorna temperatura, condição meteorológica e horário de referência
+  - **Given** uma cidade está selecionada e a fonte retorna temperatura, condição, umidade relativa, velocidade do vento, precipitação, pressão de superfície e horário de referência
   - **When** os dados são carregados
-  - **Then** o app exibe o nome da cidade, a temperatura na unidade selecionada, a condição rotulada em pt-BR e o horário de referência retornado pela fonte.
+  - **Then** o app exibe o nome da cidade, temperatura na unidade selecionada, condição em pt-BR com ícone correspondente, umidade em %, vento em km/h, precipitação em mm, pressão em hPa e o horário de referência da fonte.
 - **AC-02.2 — Dados pertencem à cidade selecionada**
   - **Given** duas cidades diferentes têm respostas de clima distintas
   - **When** o usuário seleciona uma delas
@@ -84,6 +84,14 @@ Cada critério usa Given/When/Then e deve ser validado com respostas de teste de
   - **Given** a fonte retorna um horário de referência mais antigo que duas horas em relação ao relógio do cenário
   - **When** o clima atual é exibido
   - **Then** o app mantém os dados com um aviso visível “Dados desatualizados”; com idade igual ou inferior a duas horas, não exibe esse aviso.
+- **AC-02.7 — Condição meteorológica e ícone**
+  - **Given** a fonte retorna um código WMO conhecido
+  - **When** o clima atual é exibido
+  - **Then** o rótulo em pt-BR e o ícone correspondem ao mesmo código; o ícone é decorativo para tecnologias assistivas, pois o rótulo textual fornece a condição.
+- **AC-02.8 — Código meteorológico desconhecido**
+  - **Given** a fonte retorna um código WMO sem mapeamento
+  - **When** o clima atual é exibido
+  - **Then** o app exibe “Condição não disponível” e usa o ícone genérico definido no mapeamento.
 
 ### FR-03 — Consultar previsão de cinco dias
 
@@ -255,7 +263,7 @@ Cada linha conecta a história aos requisitos funcionais, critérios de aceite e
 - Persistência local de cidade selecionada, buscas ou unidade de temperatura.
 - Mapas, alertas meteorológicos, notificações, histórico de consultas e cidades favoritas na versão inicial.
 - Comparação simultânea de várias cidades ou mais de uma cidade selecionada por vez.
-- Métricas além do mínimo especificado: temperatura, condição e horário de referência atuais; condição e temperaturas mínima/máxima diárias. Exemplos fora do escopo: umidade, vento, pressão, precipitação, índice UV, qualidade do ar e radar.
+- Métricas além do mínimo especificado: índice UV, qualidade do ar, radar, visibilidade, ponto de orvalho, direção e rajadas de vento.
 - Previsões horárias; a versão inicial apresenta resumos diários.
 - Previsões para períodos além de hoje e dos quatro dias seguintes.
 - Sugestões de busca enquanto a pessoa digita e atualização automática periódica.
