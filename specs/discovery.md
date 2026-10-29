@@ -8,7 +8,7 @@ O objetivo desta fase é esclarecer o problema e registrar requisitos, riscos e 
 
 ## Personas
 
-As personas abaixo são hipóteses iniciais derivadas do briefing e devem ser validadas com usuários reais.
+As personas abaixo são perfis-alvo do MVP, derivados do briefing e não apresentados como pesquisa empírica: Camila é o perfil primário; Marcos, o secundário; Joana representa os requisitos de acessibilidade.
 
 ### Camila — pessoa que planeja o deslocamento diário
 
@@ -68,27 +68,49 @@ Estimativas iniciais; revisar probabilidade e impacto após responder às pergun
 
 ## Decisões
 
-1. **Fonte de dados: Open-Meteo, sem API key.**  
-    Justificativa: permite usar dados meteorológicos sem exigir cadastro ou gerenciar uma chave de API para o treinamento.  
-    Resolve: define o provedor e elimina a necessidade de credenciais. Cobertura, limites de uso, atribuição e frequência de atualização ainda precisam ser confirmados.
+1. **Fonte e modo de acesso: endpoints públicos da Open-Meteo, sem API key e sem recursos `customer-`.**  
+    Justificativa: mantém o provedor escolhido sem credenciais de cliente no app.  
+    Resolve: fecha o modo de acesso e exclui chamadas a endpoints reservados. Antes do release, ainda é necessário comprovar que os termos vigentes autorizam o tipo de implantação pretendido e que cobertura, cotas e atribuição são atendidas, conforme NFR-10 da spec.
 
 2. **Previsão de cinco dias: hoje mais os quatro dias seguintes.**  
-    Justificativa: inclui as condições do dia corrente e mantém uma janela total de cinco dias.  
-    Resolve: define quais datas compõem o período. O fuso horário e a granularidade da previsão continuam em aberto.
+    Justificativa: inclui o dia corrente e mantém uma janela total de cinco dias.  
+    Resolve: define resumos diários com condição, mínima e máxima, usando o fuso local da cidade; previsão horária fica fora do MVP.
 
 3. **Unidade padrão: Celsius.**  
-    Justificativa: estabelece um padrão inicial coerente com o público e o idioma definidos para a interface. Fahrenheit continua disponível pela alternância solicitada.  
-    Resolve: define a unidade exibida inicialmente; a preferência entre sessões e as unidades de outras grandezas continuam em aberto.
+    Justificativa: estabelece um padrão inicial coerente com pt-BR. Fahrenheit continua disponível para temperatura.  
+    Resolve: define Celsius como unidade inicial, conversão para Fahrenheit e ausência de persistência da preferência entre sessões.
 
 4. **Sem autenticação e sem persistência de servidor.**  
-    Justificativa: mantém o produto focado na consulta do clima, sem contas ou armazenamento de dados em um backend.  
-    Resolve: exclui login e persistência de servidor do escopo. Persistência local no navegador ainda precisa ser decidida.
+    Justificativa: mantém o produto focado na consulta do clima, sem contas ou dados salvos.  
+    Resolve: exclui autenticação, persistência de servidor e persistência local de cidade, buscas ou unidade.
 
 5. **Idioma da interface: pt-BR.**  
-    Justificativa: define um idioma consistente para textos e apresentação inicial do produto.  
-    Resolve: estabelece pt-BR como idioma da interface; a necessidade de suportar outros idiomas continua em aberto.
+    Justificativa: define uma experiência consistente para o público inicial.  
+    Resolve: estabelece pt-BR para textos e formatos regionais; outros idiomas ficam fora do MVP.
 
-## Perguntas em Aberto
+6. **Público-alvo do MVP:** pessoas que consultam o clima atual para se preparar para o dia (primário) e pessoas que planejam atividades em outra cidade (secundário); acessibilidade por leitor de tela é requisito de uso.  
+    Justificativa: delimita o produto conforme as tarefas do briefing sem afirmar que as personas vieram de pesquisa.  
+    Resolve: define a prioridade das tarefas; a avaliação de usabilidade é critério de lançamento na spec.
+
+7. **Busca:** consulta manual por nome, para localidades indexadas pelo provedor, com até cinco resultados e sem sugestões enquanto digita.  
+    Justificativa: oferece seleção explícita e limita a lista de resultados.  
+    Resolve: define regiões conforme a cobertura do provedor, interação, limite de resultados e dados de desambiguação (região/país; coordenadas como fallback).
+
+8. **Contrato mínimo de dados:** clima atual inclui temperatura, condição e horário de referência; cada resumo diário inclui data, condição, mínima e máxima. Condições são rotuladas em pt-BR; código sem rótulo conhecido usa “Condição não disponível”.  
+    Justificativa: torna o conteúdo mínimo estável para interface e aceitação.  
+    Resolve: define campos mínimos e comportamento para condição desconhecida.
+
+9. **Atualidade:** dados atuais com horário de referência de até duas horas são aceitos como atuais; dados mais antigos são sinalizados. Sem horário utilizável, a interface informa que a atualidade não foi informada.  
+    Justificativa: estabelece um limite explícito para o usuário e para os testes.  
+    Resolve: define o limite de frescor e o fallback para timestamp ausente.
+
+10. **Atualização e falhas:** buscar dados ao selecionar uma cidade ou em uma nova tentativa manual; sem atualização periódica, cache ou uso offline no MVP.  
+     Justificativa: mantém o consumo e o comportamento da fonte previsíveis.  
+     Resolve: define quando há requisições e exclui polling, cache e modo offline.
+
+## Perguntas de Discovery (resolvidas na especificação)
+
+As perguntas abaixo registram as incertezas originais do discovery. As decisões funcionais foram fechadas em [weather-app-spec.md](weather-app-spec.md); a única condição pendente para produção é a comprovação do gate NFR-10 nessa especificação.
 
 1. **Quem são os usuários prioritários e qual decisão ou tarefa principal o app deve ajudá-los a realizar?**  
     Impacto: sem público e objetivo prioritários, não é possível priorizar conteúdo, fluxos ou critérios de sucesso.
@@ -146,10 +168,14 @@ Estimativas iniciais; revisar probabilidade e impacto após responder às pergun
 
 ## Suposições
 
-- “Buscar cidades” significa que o usuário poderá informar o nome de uma cidade e escolher um resultado.
+- A busca é enviada manualmente, cobre as localidades indexadas pelo provedor e apresenta até cinco resultados.
 - A cidade selecionada será a referência para exibir o clima atual e a previsão.
+- O mínimo de dados é temperatura, condição e horário de referência no clima atual; condição, mínima e máxima em cada resumo diário.
 - Celsius é a unidade padrão e Fahrenheit também pode ser selecionado.
-- Os dados meteorológicos serão fornecidos pela Open-Meteo, sem API key.
+- Os dados meteorológicos serão obtidos exclusivamente dos endpoints públicos da Open-Meteo, sem API key e sem chamadas a recursos com prefixo `customer-`.
+- O uso dos endpoints públicos em produção depende da comprovação dos termos, cobertura, cotas e atribuição especificados em NFR-10.
+- Dados atuais com mais de duas horas serão sinalizados como desatualizados.
+- A previsão é diária, cobre hoje e os quatro dias seguintes e usa o fuso local da cidade.
 - A interface será em pt-BR.
 - O suporte a dispositivos móveis implica uma interface responsiva e utilizável em telas pequenas.
-- Não haverá autenticação nem persistência de servidor. Geolocalização automática, persistência local e uso offline continuam sem decisão.
+- Não haverá geolocalização automática, autenticação, persistência local ou de servidor, cache, uso offline ou idiomas além de pt-BR no MVP.
