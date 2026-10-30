@@ -1,93 +1,15 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
-
-const NOW = new Date('2026-10-29T15:00:00Z');
-
-const city = {
-  id: 3448439,
-  name: 'São Paulo',
-  admin1: 'São Paulo',
-  country: 'Brasil',
-  latitude: -23.5475,
-  longitude: -46.63611,
-};
-const homonym = { ...city, id: 2, latitude: 10.5, longitude: 20.25 };
-
-const forecast = {
-  timezone: 'America/Sao_Paulo',
-  current: {
-    time: '2026-10-29T10:00',
-    temperature_2m: 0,
-    weather_code: 2,
-    relative_humidity_2m: 68,
-    wind_speed_10m: 12.3,
-    precipitation: 0.1,
-    surface_pressure: 1015.2,
-  },
-  daily: {
-    time: ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'],
-    weather_code: [2, 3, 61, 1, 0],
-    temperature_2m_min: [1.4, 16, 18, 17, 18],
-    temperature_2m_max: [20, 24, 23, 26, 27],
-  },
-};
-
-type Reply = Parameters<Route['fulfill']>[0] | 'hang';
-type Replier = (url: URL, attempt: number) => Reply;
-
-interface Api {
-  geocoding: URL[];
-  forecast: URL[];
-}
-
-/** Relógio pausado em NOW: Date é fixo e timers só disparam com fastForward. */
-async function freezeClock(page: Page) {
-  await page.clock.install({ time: new Date(NOW.getTime() - 60_000) });
-  await page.clock.pauseAt(NOW);
-}
-
-/** Registra as respostas da Open-Meteo e impede qualquer saída para a rede real. */
-async function mockApi(
-  page: Page,
-  replies: { geocoding?: Replier; forecast?: Replier } = {},
-): Promise<Api> {
-  const api: Api = { geocoding: [], forecast: [] };
-
-  // Fontes externas não fazem parte do comportamento testado e atrasariam o `load`.
-  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) =>
-    route.fulfill({ status: 200, contentType: 'text/css', body: '' }),
-  );
-
-  const respond = (calls: URL[], replier: Replier) => async (route: Route) => {
-    const url = new URL(route.request().url());
-    calls.push(url);
-    const reply = replier(url, calls.length);
-    if (reply === 'hang') return;
-    await route.fulfill(reply);
-  };
-
-  await page.route(
-    'https://geocoding-api.open-meteo.com/**',
-    respond(api.geocoding, replies.geocoding ?? (() => ({ json: { results: [city] } }))),
-  );
-  await page.route(
-    'https://api.open-meteo.com/**',
-    respond(api.forecast, replies.forecast ?? (() => ({ json: forecast }))),
-  );
-  return api;
-}
-
-async function searchFor(page: Page, name: string) {
-  await page.getByRole('searchbox', { name: 'Cidade' }).fill(name);
-  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-}
-
-const currentRegion = (page: Page) => page.getByRole('region', { name: city.name, exact: true });
-const forecastRegion = (page: Page) =>
-  page.getByRole('region', { name: `Previsão em ${city.name}`, exact: true });
-const unitButton = (page: Page, unit: 'Celsius' | 'Fahrenheit') =>
-  page
-    .getByRole('group', { name: 'Unidade de temperatura' })
-    .getByRole('button', { name: unit, exact: true });
+import { expect, test } from '@playwright/test';
+import {
+  city,
+  currentRegion,
+  forecast,
+  forecastRegion,
+  freezeClock,
+  homonym,
+  mockApi,
+  searchFor,
+  unitButton,
+} from './support';
 
 test.describe('Weather app', () => {
   test.beforeEach(async ({ page }) => {
@@ -271,6 +193,132 @@ test.describe('Weather app', () => {
       'Alguns dados não estão disponíveis',
     );
     await expect(currentRegion(page)).toBeVisible();
+  });
+
+  test('keeps keyboard focus while searching, choosing a city and retrying', async ({ page }) => {
+    let homonymFailures = 0;
+    await mockApi(page, {
+      geocoding: () => ({ json: { results: [city, homonym] } }),
+      forecast: (url) =>
+        url.searchParams.get('latitude') === String(homonym.latitude) && homonymFailures++ === 0
+          ? { status: 503, json: {} }
+          : { json: forecast },
+    });
+    await page.goto('/');
+    const input = page.getByRole('searchbox', { name: 'Cidade' });
+
+    await input.fill('São Paulo');
+    await input.press('Enter');
+    await expect(currentRegion(page)).toBeVisible();
+    await expect(input).toBeFocused();
+
+    const homonymButton = page
+      .getByRole('group', { name: 'Cidades encontradas' })
+      .getByRole('button', { name: /\(10,50, 20,25\)$/ });
+    await homonymButton.focus();
+    await homonymButton.press('Enter');
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(homonymButton).toBeFocused();
+
+    const retry = page.getByRole('button', { name: 'Tentar novamente' });
+    await retry.focus();
+    await retry.press('Enter');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(currentRegion(page)).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Condições meteorológicas' })).toBeFocused();
+  });
+
+  test('draws the search field boundary with at least 3:1 contrast', async ({ page }) => {
+    await mockApi(page);
+    await page.goto('/');
+
+    const ratio = await page.getByRole('searchbox', { name: 'Cidade' }).evaluate((input) => {
+      type Color = { r: number; g: number; b: number; a: number };
+      const parse = (value: string): Color => {
+        const [r, g, b, a = 1] = (value.match(/[\d.]+/g) ?? []).map(Number);
+        return { r, g, b, a };
+      };
+      const over = (top: Color, base: Color): Color => ({
+        r: top.r * top.a + base.r * (1 - top.a),
+        g: top.g * top.a + base.g * (1 - top.a),
+        b: top.b * top.a + base.b * (1 - top.a),
+        a: 1,
+      });
+      const luminance = ({ r, g, b }: Color) => {
+        const [lr, lg, lb] = [r, g, b].map((channel) => {
+          const value = channel / 255;
+          return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+      };
+      // Pior caso: ponto mais claro do gradiente de fundo da página.
+      const lightestBackground: Color = { r: 0x1a, g: 0x21, b: 0x38, a: 1 };
+      const backgroundOf = (element: Element): Color => {
+        const layers: Color[] = [];
+        for (let node: Element | null = element; node; node = node.parentElement) {
+          const color = parse(getComputedStyle(node).backgroundColor);
+          if (color.a > 0) layers.push(color);
+        }
+        return layers.reverse().reduce(over, lightestBackground);
+      };
+      const surrounding = backgroundOf(input.parentElement as Element);
+      const border = over(parse(getComputedStyle(input).borderTopColor), backgroundOf(input));
+      const [lighter, darker] = [luminance(border), luminance(surrounding)].sort((a, b) => b - a);
+      return (lighter + 0.05) / (darker + 0.05);
+    });
+
+    expect(ratio).toBeGreaterThanOrEqual(3);
+  });
+
+  test('never shows NaN, undefined or null when the API returns null and absent fields', async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      geocoding: () => ({
+        json: {
+          results: [{ id: 9, name: 'São Paulo', admin1: null, latitude: -23.5, longitude: -46.6 }],
+        },
+      }),
+      forecast: () => ({
+        json: {
+          timezone: 'America/Sao_Paulo',
+          current: {
+            time: null,
+            temperature_2m: null,
+            weather_code: null,
+            relative_humidity_2m: 0,
+            wind_speed_10m: null,
+            precipitation: null,
+            // surface_pressure ausente
+          },
+          daily: {
+            time: ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'],
+            weather_code: [null, 3, null, 1, 0],
+            temperature_2m_min: [null, 16, 0, null, 18],
+            temperature_2m_max: [20, null, 0, 26, null],
+          },
+        },
+      }),
+    });
+    await page.goto('/');
+
+    await searchFor(page, 'São Paulo');
+
+    const current = currentRegion(page);
+    await expect(current).toBeVisible();
+    await expect(current).toContainText('Atualidade não informada');
+    await expect(current).toContainText('Condição não disponível');
+    await expect(current.getByText('0%', { exact: true })).toBeVisible();
+    await expect(current.getByText('0 mm', { exact: true })).toBeVisible();
+    await expect(current.getByText('Não disponível', { exact: true })).toHaveCount(3);
+    await expect(forecastRegion(page).getByRole('listitem')).toHaveCount(5);
+    await expect(forecastRegion(page).getByText('0 °C', { exact: true })).toHaveCount(2);
+
+    for (const unit of ['Celsius', 'Fahrenheit'] as const) {
+      await unitButton(page, unit).click();
+      await expect(page.locator('main')).not.toContainText(/NaN|undefined|null|Infinity/);
+    }
+    await expect(forecastRegion(page).getByText('32 °F', { exact: true })).toHaveCount(2);
   });
 
   test.describe('narrow viewport', () => {

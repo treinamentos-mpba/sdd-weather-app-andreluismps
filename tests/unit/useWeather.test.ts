@@ -58,6 +58,47 @@ describe('useWeather', () => {
     expect(weatherMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['an empty string', ''],
+    ['spaces', '    '],
+    ['a tab', '\t'],
+    ['a line break', '\n'],
+    ['a non-breaking space', '\u00a0'],
+    ['an ideographic space', '\u3000'],
+  ])('never calls a service for %s, and retry does not either', async (_label, blank) => {
+    const { result } = renderHook(() => useWeather());
+
+    await act(() => result.current.search(blank));
+    await act(() => result.current.retry());
+
+    expect(result.current).toMatchObject({
+      status: 'empty',
+      query: '',
+      cities: [],
+      selectedCity: null,
+      data: null,
+      error: null,
+    });
+    expect(searchMock).not.toHaveBeenCalled();
+    expect(weatherMock).not.toHaveBeenCalled();
+  });
+
+  it('passes special characters to the service trimmed but otherwise untouched', async () => {
+    searchMock.mockResolvedValue([]);
+    const { result } = renderHook(() => useWeather());
+
+    await act(() => result.current.search("  L'Haÿ-les-Roses  "));
+    await act(() => result.current.search('Aix-en-Provence'));
+    await act(() => result.current.search('<b>x</b> & y'));
+
+    expect(searchMock.mock.calls.map(([name]) => name)).toEqual([
+      "L'Haÿ-les-Roses",
+      'Aix-en-Provence',
+      '<b>x</b> & y',
+    ]);
+    expect(result.current.query).toBe('<b>x</b> & y');
+  });
+
   it('stays loading through geocoding and automatically loads the first city', async () => {
     const cities = deferred<City[]>();
     const weather = deferred<WeatherData>();

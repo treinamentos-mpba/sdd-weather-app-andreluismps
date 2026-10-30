@@ -14,7 +14,7 @@ export default function UnitToggle({ unit, onChange }: UnitToggleProps) {
     >
       <button
         type="button"
-        aria-label="Celsius"
+        aria-label="°C Celsius"
         aria-pressed={unit === 'celsius'}
         onClick={() => onChange('celsius')}
         className={`min-h-11 min-w-11 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 ${
@@ -27,7 +27,7 @@ export default function UnitToggle({ unit, onChange }: UnitToggleProps) {
       </button>
       <button
         type="button"
-        aria-label="Fahrenheit"
+        aria-label="°F Fahrenheit"
         aria-pressed={unit === 'fahrenheit'}
         onClick={() => onChange('fahrenheit')}
         className={`min-h-11 min-w-11 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 ${

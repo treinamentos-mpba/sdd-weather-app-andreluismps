@@ -78,7 +78,13 @@ describe('App edge cases', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Carregando...');
     expect(screen.queryByText('22 °C')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Recife, Brazil' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Recife, Brazil' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Recife, Brazil' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(weatherMock).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -150,7 +156,7 @@ describe('App edge cases', () => {
       ['-1 °C', '-1 °C'],
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+    await user.click(screen.getByRole('button', { name: '°F Fahrenheit' }));
     expect(current).toHaveTextContent('35 °F');
     expect(shown()).toEqual([
       ['32 °F', '32 °F'],
@@ -160,7 +166,7 @@ describe('App edge cases', () => {
       ['31 °F', '31 °F'],
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'Celsius' }));
+    await user.click(screen.getByRole('button', { name: '°C Celsius' }));
     expect(current).toHaveTextContent('1 °C');
     expect(shown()[3]).toEqual(['1 °C', '1 °C']);
     expect(weatherMock).toHaveBeenCalledOnce();

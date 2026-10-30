@@ -28,11 +28,26 @@ describe('UnitToggle', () => {
 
     expect(screen.getByRole('group', { name: 'Unidade de temperatura' })).toBeInTheDocument();
     expect(screen.getAllByRole('button')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Celsius' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Fahrenheit' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '°C Celsius' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: '°F Fahrenheit' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
+  });
+
+  it('keeps the visible symbol in the accessible name so voice control can target it', () => {
+    render(<UnitToggle unit="celsius" onChange={vi.fn()} />);
+
+    for (const button of screen.getAllByRole('button')) {
+      const visibleSymbol = button.textContent ?? '';
+      expect(visibleSymbol).toMatch(/^°[CF]$/);
+      expect(button).toHaveAccessibleName(new RegExp(`^${visibleSymbol} `));
+    }
+    expect(screen.getByRole('button', { name: '°C Celsius' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '°F Fahrenheit' })).toBeInTheDocument();
   });
 
   it('calls onChange with the selected unit', async () => {
@@ -40,7 +55,7 @@ describe('UnitToggle', () => {
     const onChange = vi.fn();
     render(<UnitToggle unit="celsius" onChange={onChange} />);
 
-    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+    await user.click(screen.getByRole('button', { name: '°F Fahrenheit' }));
 
     expect(onChange).toHaveBeenCalledOnce();
     expect(onChange).toHaveBeenCalledWith('fahrenheit');
@@ -50,8 +65,8 @@ describe('UnitToggle', () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<UnitToggle unit="celsius" onChange={onChange} />);
-    const celsiusButton = screen.getByRole('button', { name: 'Celsius' });
-    const fahrenheitButton = screen.getByRole('button', { name: 'Fahrenheit' });
+    const celsiusButton = screen.getByRole('button', { name: '°C Celsius' });
+    const fahrenheitButton = screen.getByRole('button', { name: '°F Fahrenheit' });
 
     await user.tab();
     expect(celsiusButton).toHaveFocus();
@@ -68,8 +83,8 @@ describe('UnitToggle', () => {
     const user = userEvent.setup();
     render(<TemperaturePreview />);
     const weatherRegion = screen.getByRole('region', { name: mockWeatherData.city.name });
-    const celsiusButton = screen.getByRole('button', { name: 'Celsius' });
-    const fahrenheitButton = screen.getByRole('button', { name: 'Fahrenheit' });
+    const celsiusButton = screen.getByRole('button', { name: '°C Celsius' });
+    const fahrenheitButton = screen.getByRole('button', { name: '°F Fahrenheit' });
 
     expect(weatherRegion).toHaveTextContent('0 °C');
     expect(celsiusButton).toHaveAttribute('aria-pressed', 'true');

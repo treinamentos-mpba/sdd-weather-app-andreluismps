@@ -49,12 +49,12 @@ export default function SearchBar({ onSearch, disabled = false }: SearchBarProps
           type="search"
           autoComplete="off"
           value={query}
-          disabled={disabled}
+          readOnly={disabled}
           aria-invalid={feedback ? true : undefined}
           aria-describedby={feedback ? 'city-search-feedback' : undefined}
           onChange={(event) => handleChange(event.currentTarget.value)}
           placeholder="Digite o nome de uma cidade"
-          className="min-w-0 rounded-lg border border-white/10 bg-night-800 px-3 py-2.5 text-white placeholder:text-white/50 focus-visible:border-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-w-0 rounded-lg border border-white/50 bg-night-800 px-3 py-2.5 text-white placeholder:text-white/50 focus-visible:border-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 read-only:cursor-not-allowed read-only:opacity-60"
         />
         {feedback && (
           <p id="city-search-feedback" role="status" className="text-sm text-sun">
@@ -64,8 +64,8 @@ export default function SearchBar({ onSearch, disabled = false }: SearchBarProps
       </div>
       <button
         type="submit"
-        disabled={disabled}
-        className="min-h-11 rounded-lg bg-accent-500 px-4 py-2.5 font-medium text-night-900 hover:bg-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-disabled={disabled}
+        className="min-h-11 rounded-lg bg-accent-500 px-4 py-2.5 font-medium text-night-900 hover:bg-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
       >
         Buscar
       </button>

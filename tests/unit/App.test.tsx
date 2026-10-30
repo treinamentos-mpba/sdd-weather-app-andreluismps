@@ -44,13 +44,13 @@ describe('App', () => {
     expect(screen.getByText('22 °C')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
 
-    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+    await user.click(screen.getByRole('button', { name: '°F Fahrenheit' }));
 
     expect(screen.getByText('72 °F')).toBeInTheDocument();
     expect(screen.getAllByText('63 °F')).toHaveLength(2);
     expect(screen.getByText('77 °F')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Celsius' }));
+    await user.click(screen.getByRole('button', { name: '°C Celsius' }));
 
     expect(screen.getByText('22 °C')).toBeInTheDocument();
     expect(searchMock).toHaveBeenCalledExactlyOnceWith('São Paulo');
@@ -71,7 +71,7 @@ describe('App', () => {
     expect(weatherMock).not.toHaveBeenCalled();
   });
 
-  it('shows loading and disables search until the weather request finishes', async () => {
+  it('shows loading and blocks a new search without losing focus until the weather request finishes', async () => {
     const user = userEvent.setup();
     let resolveWeather!: (data: WeatherData) => void;
     weatherMock.mockReturnValue(
@@ -80,14 +80,18 @@ describe('App', () => {
       }),
     );
     render(<App />);
+    const input = screen.getByRole('searchbox');
 
-    await user.type(screen.getByRole('searchbox'), 'São Paulo');
-    await user.click(screen.getByRole('button', { name: 'Buscar' }));
+    await user.type(input, 'São Paulo{Enter}');
 
     expect(screen.getByRole('status')).toHaveTextContent('Carregando...');
-    expect(screen.getByRole('searchbox')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Buscar' })).toBeDisabled();
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Buscar' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByText('22 °C')).not.toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(searchMock).toHaveBeenCalledOnce();
 
     await act(async () => {
       resolveWeather(mockWeatherData);
@@ -95,7 +99,28 @@ describe('App', () => {
 
     expect(await screen.findByText('22 °C')).toBeInTheDocument();
     expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
-    expect(screen.getByRole('searchbox')).toBeEnabled();
+    expect(input).toHaveFocus();
+    expect(input).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Buscar' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+  });
+
+  it('moves focus to the results region when retrying so it is not lost to the body', async () => {
+    const user = userEvent.setup();
+    weatherMock.mockRejectedValueOnce(new WeatherServiceError('api'));
+    weatherMock.mockReturnValueOnce(new Promise(() => {}));
+    render(<App />);
+    await user.type(screen.getByRole('searchbox'), 'São Paulo{Enter}');
+    const retry = await screen.findByRole('button', { name: 'Tentar novamente' });
+
+    retry.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Condições meteorológicas' })).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
   });
 
   it.each([
@@ -148,7 +173,7 @@ describe('App', () => {
     await user.type(screen.getByRole('searchbox'), 'São Paulo');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
     await screen.findByRole('heading', { name: 'Sao Paulo' });
-    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
+    await user.click(screen.getByRole('button', { name: '°F Fahrenheit' }));
 
     expect(screen.getAllByText('Não disponível').length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText('32 °F')).toBeInTheDocument();
@@ -199,16 +224,19 @@ describe('App', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem');
     const { unmount } = render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Fahrenheit' }));
-    expect(screen.getByRole('button', { name: 'Fahrenheit' })).toHaveAttribute(
+    await user.click(screen.getByRole('button', { name: '°F Fahrenheit' }));
+    expect(screen.getByRole('button', { name: '°F Fahrenheit' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
     unmount();
     render(<App />);
 
-    expect(screen.getByRole('button', { name: 'Celsius' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Fahrenheit' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '°C Celsius' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: '°F Fahrenheit' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );

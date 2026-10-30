@@ -69,14 +69,20 @@ describe('CityList', () => {
     expect(onSelect).toHaveBeenLastCalledWith(saoPaulo);
   });
 
-  it('disables selection while a request is in progress', async () => {
+  it('blocks selection while busy but keeps keyboard focus on the chosen city', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<CityList cities={[saoPaulo, recife]} disabled onSelect={onSelect} />);
+    const { rerender } = render(<CityList cities={[saoPaulo, recife]} onSelect={onSelect} />);
+    screen.getByRole('button', { name: 'Recife, Brasil' }).focus();
 
-    await user.click(screen.getByRole('button', { name: 'Recife, Brasil' }));
+    rerender(<CityList cities={[saoPaulo, recife]} disabled onSelect={onSelect} />);
+    const recifeButton = screen.getByRole('button', { name: 'Recife, Brasil' });
+    await user.click(recifeButton);
+    await user.keyboard('{Enter}');
 
-    expect(screen.getByRole('button', { name: 'Recife, Brasil' })).toBeDisabled();
+    expect(recifeButton).toHaveFocus();
+    expect(recifeButton).not.toBeDisabled();
+    expect(recifeButton).toHaveAttribute('aria-disabled', 'true');
     expect(onSelect).not.toHaveBeenCalled();
   });
 });

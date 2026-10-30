@@ -1,4 +1,5 @@
 import type { WeatherCodePresentation } from '../types/weather';
+import { isFiniteNumber } from './format';
 
 const UNKNOWN_WEATHER: WeatherCodePresentation = {
   label: 'Condição não disponível',
@@ -36,7 +37,7 @@ const WEATHER_CODE_PRESENTATIONS: Record<number, WeatherCodePresentation> = {
   99: { label: 'Trovoada com granizo intenso', icon: '⛈️' },
 };
 
-export function getWeatherPresentation(code?: number): WeatherCodePresentation {
-  if (code === undefined) return UNKNOWN_WEATHER;
+export function getWeatherPresentation(code?: unknown): WeatherCodePresentation {
+  if (!isFiniteNumber(code)) return UNKNOWN_WEATHER;
   return WEATHER_CODE_PRESENTATIONS[code] ?? UNKNOWN_WEATHER;
 }

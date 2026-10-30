@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { formatMetric, formatReferenceTime, type MetricUnit } from '../lib/format';
+import { formatMetric, formatReferenceTime, isFiniteNumber, type MetricUnit } from '../lib/format';
 import { formatTemperature } from '../lib/temperature';
 import { getWeatherPresentation } from '../lib/weatherCodes';
 import type { City, CurrentWeather as CurrentWeatherData, Unit } from '../types/weather';
@@ -19,24 +19,18 @@ export default function CurrentWeather({
 }: CurrentWeatherProps) {
   const headingId = useId();
   const weatherPresentation = getWeatherPresentation(current.weatherCode);
-  const temperature =
-    current.temperatureC === undefined
-      ? 'Não disponível'
-      : formatTemperature(current.temperatureC, unit);
+  const temperature = formatTemperature(current.temperatureC, unit);
   const locationDetails = [city.admin1, city.country].filter(Boolean).join(', ');
   const referenceTimeLabel = formatReferenceTime(current.referenceTime);
-  const metrics: Array<{ label: string; value: number | undefined; unit: MetricUnit }> = [
+  const metrics: Array<{ label: string; value: unknown; unit: MetricUnit }> = [
     { label: 'Umidade relativa', value: current.relativeHumidityPercent, unit: '%' },
     { label: 'Vento', value: current.windSpeedKmh, unit: 'km/h' },
     { label: 'Precipitação', value: current.precipitationMm, unit: 'mm' },
     { label: 'Pressão', value: current.surfacePressureHpa, unit: 'hPa' },
   ];
-  const hasMissingData =
-    current.temperatureC === undefined ||
-    current.relativeHumidityPercent === undefined ||
-    current.windSpeedKmh === undefined ||
-    current.precipitationMm === undefined ||
-    current.surfacePressureHpa === undefined;
+  const hasMissingData = ![current.temperatureC, ...metrics.map(({ value }) => value)].every(
+    isFiniteNumber,
+  );
 
   return (
     <section
@@ -64,7 +58,7 @@ export default function CurrentWeather({
       <div className="mt-6">
         <p className="text-sm text-white/60">Temperatura</p>
         <p
-          className={`mt-1 font-semibold tabular-nums ${current.temperatureC === undefined ? 'text-2xl sm:text-3xl' : 'text-5xl sm:text-6xl'}`}
+          className={`mt-1 font-semibold tabular-nums ${isFiniteNumber(current.temperatureC) ? 'text-5xl sm:text-6xl' : 'text-2xl sm:text-3xl'}`}
           aria-live="polite"
         >
           {temperature}

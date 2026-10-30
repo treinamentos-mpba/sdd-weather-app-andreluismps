@@ -20,27 +20,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function mapCity(value: unknown): City {
+function mapCity(value: unknown): City | null {
   if (
     !isRecord(value) ||
     typeof value.id !== 'number' ||
     !Number.isFinite(value.id) ||
     typeof value.name !== 'string' ||
+    !value.name.trim() ||
     typeof value.latitude !== 'number' ||
     !Number.isFinite(value.latitude) ||
     typeof value.longitude !== 'number' ||
-    !Number.isFinite(value.longitude) ||
-    (value.admin1 !== undefined && typeof value.admin1 !== 'string') ||
-    (value.country !== undefined && typeof value.country !== 'string')
+    !Number.isFinite(value.longitude)
   ) {
-    throw new WeatherServiceError('invalid-response');
+    return null;
   }
 
   return {
     id: value.id,
     name: value.name,
-    admin1: value.admin1,
-    country: value.country,
+    admin1: typeof value.admin1 === 'string' && value.admin1 ? value.admin1 : undefined,
+    country: typeof value.country === 'string' && value.country ? value.country : undefined,
     latitude: value.latitude,
     longitude: value.longitude,
   };
@@ -99,10 +98,18 @@ export async function searchCities(name: string): Promise<City[]> {
 
   const url = `${GEOCODING_URL}?name=${encodeURIComponent(query)}&count=5&language=pt&format=json`;
   const payload = await fetchWithTimeout(url, SEARCH_ERROR_MESSAGE);
-  if (payload.results === undefined) return [];
+  if (payload.results === undefined || payload.results === null) return [];
   if (!Array.isArray(payload.results)) throw new WeatherServiceError('invalid-response');
 
-  return payload.results.slice(0, 5).map(mapCity);
+  // Uma entrada inválida não derruba as demais; só falha se nenhuma for utilizável.
+  const cities = payload.results
+    .map(mapCity)
+    .filter((city): city is City => city !== null)
+    .slice(0, 5);
+  if (payload.results.length > 0 && cities.length === 0) {
+    throw new WeatherServiceError('invalid-response');
+  }
+  return cities;
 }
 
 function optionalNumber(value: unknown): number | undefined {
@@ -193,17 +200,35 @@ export async function getWeather(city: City): Promise<WeatherData> {
   }
 
   try {
+    const temperatureC = optionalNumber(current.temperature_2m);
+    const weatherCode = optionalNumber(current.weather_code);
+    const relativeHumidityPercent = optionalNumber(current.relative_humidity_2m);
+    const windSpeedKmh = optionalNumber(current.wind_speed_10m);
+    const surfacePressureHpa = optionalNumber(current.surface_pressure);
+    const hasOtherCurrentData = [
+      temperatureC,
+      weatherCode,
+      relativeHumidityPercent,
+      windSpeedKmh,
+      surfacePressureHpa,
+    ].some((value) => value !== undefined);
+    // precipitation null com o resto presente significa "sem chuva"; sem nada, não há dado.
+    const precipitationMm =
+      current.precipitation === null && hasOtherCurrentData
+        ? 0
+        : optionalNumber(current.precipitation);
+
     return {
       city,
       timezone,
       current: {
-        temperatureC: optionalNumber(current.temperature_2m),
-        weatherCode: optionalNumber(current.weather_code),
-        relativeHumidityPercent: optionalNumber(current.relative_humidity_2m),
-        windSpeedKmh: optionalNumber(current.wind_speed_10m),
-        precipitationMm: current.precipitation === null ? 0 : optionalNumber(current.precipitation),
-        surfacePressureHpa: optionalNumber(current.surface_pressure),
-        referenceTime: current.time ?? undefined,
+        temperatureC,
+        weatherCode,
+        relativeHumidityPercent,
+        windSpeedKmh,
+        precipitationMm,
+        surfacePressureHpa,
+        referenceTime: typeof current.time === 'string' && current.time ? current.time : undefined,
       },
       forecast: mapForecast(daily, timezone),
     };

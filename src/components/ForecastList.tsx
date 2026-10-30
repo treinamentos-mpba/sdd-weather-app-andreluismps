@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { formatForecastDate, isFiniteNumber } from '../lib/format';
 import { formatTemperature } from '../lib/temperature';
 import { getWeatherPresentation } from '../lib/weatherCodes';
 import type { City, ForecastDay, Unit } from '../types/weather';
@@ -9,23 +10,10 @@ interface ForecastListProps {
   unit: Unit;
 }
 
-function formatForecastDate(date: string): string {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    timeZone: 'UTC',
-    weekday: 'short',
-  }).format(new Date(`${date}T12:00:00Z`));
-}
-
-function displayTemperature(value: number | undefined, unit: Unit): string {
-  return value === undefined ? 'Não disponível' : formatTemperature(value, unit);
-}
-
 export default function ForecastList({ city, forecast, unit }: ForecastListProps) {
   const headingId = useId();
   const hasMissingData = forecast.some(
-    (day) => day.weatherCode === undefined || day.minC === undefined || day.maxC === undefined,
+    (day) => ![day.weatherCode, day.minC, day.maxC].every(isFiniteNumber),
   );
 
   return (
@@ -65,13 +53,13 @@ export default function ForecastList({ city, forecast, unit }: ForecastListProps
                     <div>
                       <dt className="text-white/70">Mín.</dt>
                       <dd className="mt-1 font-medium tabular-nums">
-                        {displayTemperature(day.minC, unit)}
+                        {formatTemperature(day.minC, unit)}
                       </dd>
                     </div>
                     <div>
                       <dt className="text-white/70">Máx.</dt>
                       <dd className="mt-1 font-medium tabular-nums">
-                        {displayTemperature(day.maxC, unit)}
+                        {formatTemperature(day.maxC, unit)}
                       </dd>
                     </div>
                   </dl>

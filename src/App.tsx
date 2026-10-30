@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import CityList from './components/CityList';
 import CurrentWeather from './components/CurrentWeather';
 import ForecastList from './components/ForecastList';
@@ -14,6 +14,7 @@ import type { Unit } from './types/weather';
 export default function App() {
   const { status, data, cities, selectedCity, error, search, selectCity, retry } = useWeather();
   const [unit, setUnit] = useState<Unit>('celsius');
+  const resultsRef = useRef<HTMLElement>(null);
 
   return (
     <div className="min-h-screen break-words bg-[linear-gradient(145deg,#1a2138_0%,#0b1020_42%,#11162a_100%)] text-white">
@@ -36,7 +37,12 @@ export default function App() {
           onSelect={selectCity}
         />
 
-        <section aria-label="Condições meteorológicas" className="grid gap-5">
+        <section
+          ref={resultsRef}
+          tabIndex={-1}
+          aria-label="Condições meteorológicas"
+          className="grid gap-5 focus:outline-none"
+        >
           {status === 'idle' && (
             <div className="border-y border-white/10 py-10 sm:py-14">
               <p className="text-sm font-medium uppercase text-white/55">Clima local</p>
@@ -61,7 +67,11 @@ export default function App() {
           {status === 'error' && (
             <ErrorState
               message={error ?? 'Não foi possível carregar o clima. Tente novamente.'}
-              onRetry={retry}
+              onRetry={() => {
+                void retry();
+                // O ErrorState sai da tela no retry; sem isso o foco cairia no body.
+                resultsRef.current?.focus();
+              }}
             />
           )}
 

@@ -72,6 +72,7 @@ describe('searchCities', () => {
   it.each([
     {},
     { results: [] },
+    { results: null },
   ])('returns an empty list for a successful empty payload %j', async (payload) => {
     mockResponse(payload);
 
@@ -112,7 +113,7 @@ describe('searchCities', () => {
   it.each([
     null,
     [],
-    { results: null },
+    { results: 'nope' },
     { results: [{ ...city, latitude: 'invalid' }] },
   ])('rejects malformed payloads %j', async (payload) => {
     mockResponse(payload);

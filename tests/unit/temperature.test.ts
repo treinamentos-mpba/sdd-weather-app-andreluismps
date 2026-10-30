@@ -49,6 +49,24 @@ describe('formatTemperature', () => {
   });
 
   it.each([
+    null,
+    undefined,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    '22',
+    {},
+  ])('shows %s as unavailable instead of NaN, in both units', (value) => {
+    expect(formatTemperature(value, 'celsius')).toBe('Não disponível');
+    expect(formatTemperature(value, 'fahrenheit')).toBe('Não disponível');
+  });
+
+  it('does not treat zero as missing', () => {
+    expect(formatTemperature(0, 'celsius')).toBe('0 °C');
+    expect(formatTemperature(-0, 'fahrenheit')).toBe('32 °F');
+  });
+
+  it.each([
     ['celsius', '°C'],
     ['fahrenheit', '°F'],
   ] as const)('uses the unitLabel %s → %s', (unit, label) => {

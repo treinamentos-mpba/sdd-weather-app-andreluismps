@@ -15,6 +15,9 @@ describe('getWeatherPresentation', () => {
 
   it.each([
     undefined,
+    null,
+    '2',
+    {},
     999,
     -1,
     Number.NaN,
