@@ -13,15 +13,18 @@ describe('getWeatherPresentation', () => {
     expect(getWeatherPresentation(code)).toEqual({ label, icon });
   });
 
-  it.each([undefined, 999, -1, Number.NaN, Number.POSITIVE_INFINITY])(
-    'returns the generic presentation for missing or unknown code %s',
-    (code) => {
-      expect(getWeatherPresentation(code)).toEqual({
-        label: 'Condição não disponível',
-        icon: '❔',
-      });
-    },
-  );
+  it.each([
+    undefined,
+    999,
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+  ])('returns the generic presentation for missing or unknown code %s', (code) => {
+    expect(getWeatherPresentation(code)).toEqual({
+      label: 'Condição não disponível',
+      icon: '❔',
+    });
+  });
 
   it('uses the fallback when no code argument is provided', () => {
     expect(getWeatherPresentation()).toEqual({

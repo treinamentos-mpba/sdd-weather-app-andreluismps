@@ -41,6 +41,18 @@ describe('SearchBar', () => {
     );
   });
 
+  it('does not search while the user is typing before submitting', async () => {
+    const user = userEvent.setup();
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+
+    await user.type(screen.getByLabelText('Cidade'), 'São Paulo');
+
+    expect(onSearch).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('São Paulo');
+  });
+
   it('preserves special characters in the submitted city name', async () => {
     const user = userEvent.setup();
     const onSearch = vi.fn();

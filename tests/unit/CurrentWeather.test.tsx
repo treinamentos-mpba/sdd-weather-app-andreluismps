@@ -76,4 +76,57 @@ describe('CurrentWeather', () => {
 
     expect(screen.getByText('Dados desatualizados')).toBeInTheDocument();
   });
+
+  it('does not claim freshness when the source reference time is missing', () => {
+    render(
+      <CurrentWeather
+        city={mockWeatherData.city}
+        current={{ ...completeCurrent, referenceTime: undefined }}
+        unit="celsius"
+      />,
+    );
+
+    expect(screen.getByText('Atualidade não informada')).toBeInTheDocument();
+    expect(screen.queryByText('Dados desatualizados')).not.toBeInTheDocument();
+  });
+
+  it('treats zero as a real value, never as missing data', () => {
+    render(
+      <CurrentWeather
+        city={mockWeatherData.city}
+        current={{
+          temperatureC: 0,
+          weatherCode: 0,
+          relativeHumidityPercent: 0,
+          windSpeedKmh: 0,
+          precipitationMm: 0,
+          surfacePressureHpa: 0,
+          referenceTime: '2026-10-29T10:00',
+        }}
+        unit="fahrenheit"
+      />,
+    );
+
+    expect(screen.getByText('32 °F')).toBeInTheDocument();
+    expect(screen.getByText('Céu limpo')).toBeInTheDocument();
+    for (const value of ['0%', '0 km/h', '0 mm', '0 hPa']) {
+      expect(screen.getByText(value)).toBeInTheDocument();
+    }
+    expect(screen.queryByText('Não disponível')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows an absent temperature as unavailable instead of converting it', () => {
+    render(
+      <CurrentWeather
+        city={mockWeatherData.city}
+        current={{ ...completeCurrent, temperatureC: undefined }}
+        unit="fahrenheit"
+      />,
+    );
+
+    expect(screen.getByText('Temperatura').nextElementSibling).toHaveTextContent('Não disponível');
+    expect(document.body).not.toHaveTextContent(/NaN|°F/);
+    expect(screen.getByRole('status')).toHaveTextContent('Alguns dados não estão disponíveis');
+  });
 });

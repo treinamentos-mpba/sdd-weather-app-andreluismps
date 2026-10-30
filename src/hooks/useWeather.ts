@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { getWeather, searchCities, WeatherServiceError } from '../services/weatherService';
+import { getWeather, searchCities } from '../services/weatherService';
 import type { City, RequestState, WeatherData } from '../types/weather';
 
 interface WeatherState {
   status: RequestState<WeatherData>['status'];
   data: WeatherData | null;
   cities: City[];
+  selectedCity: City | null;
   error: string | null;
   query: string;
 }
@@ -18,9 +19,8 @@ interface UseWeatherResult extends WeatherState {
 
 type Operation = { type: 'search'; name: string } | { type: 'weather'; city: City };
 
-function errorMessage(reason: unknown, fallback: string): string {
-  return reason instanceof WeatherServiceError ? reason.message : fallback;
-}
+const SEARCH_ERROR_MESSAGE = 'Não foi possível buscar cidades. Tente novamente.';
+const WEATHER_ERROR_MESSAGE = 'Não foi possível carregar o clima. Tente novamente.';
 
 function hasWeatherData(data: WeatherData): boolean {
   const currentValues = data.current ? Object.values(data.current) : [];
@@ -39,6 +39,7 @@ export default function useWeather(): UseWeatherResult {
     status: 'idle',
     data: null,
     cities: [],
+    selectedCity: null,
     error: null,
     query: '',
   });
@@ -62,13 +63,13 @@ export default function useWeather(): UseWeatherResult {
         data,
         error: null,
       }));
-    } catch (reason) {
+    } catch {
       if (operationId !== requestId.current) return;
       setState((previous) => ({
         ...previous,
         status: 'error',
         data: null,
-        error: errorMessage(reason, 'Não foi possível carregar o clima. Tente novamente.'),
+        error: WEATHER_ERROR_MESSAGE,
       }));
     }
   }
@@ -77,33 +78,61 @@ export default function useWeather(): UseWeatherResult {
     const query = name.trim();
     const operationId = ++requestId.current;
     lastOperation.current = { type: 'search', name: query };
-    setState({ status: query ? 'loading' : 'empty', query, cities: [], data: null, error: null });
+    setState({
+      status: query ? 'loading' : 'empty',
+      query,
+      cities: [],
+      selectedCity: null,
+      data: null,
+      error: null,
+    });
     if (!query) return;
 
     try {
       const cities = await searchCities(query);
       if (operationId !== requestId.current) return;
       if (cities.length === 0) {
-        setState({ status: 'empty', query, cities: [], data: null, error: null });
+        setState({
+          status: 'empty',
+          query,
+          cities: [],
+          selectedCity: null,
+          data: null,
+          error: null,
+        });
         return;
       }
-      setState({ status: 'loading', query, cities, data: null, error: null });
+      setState({
+        status: 'loading',
+        query,
+        cities,
+        selectedCity: cities[0],
+        data: null,
+        error: null,
+      });
       await loadWeather(cities[0], operationId);
-    } catch (reason) {
+    } catch {
       if (operationId !== requestId.current) return;
       setState({
         status: 'error',
         query,
         cities: [],
+        selectedCity: null,
         data: null,
-        error: errorMessage(reason, 'Não foi possível buscar cidades. Tente novamente.'),
+        error: SEARCH_ERROR_MESSAGE,
       });
     }
   }
 
   async function selectCity(city: City): Promise<void> {
     const operationId = ++requestId.current;
-    setState((previous) => ({ ...previous, status: 'loading', data: null, error: null }));
+    setState((previous) => ({
+      ...previous,
+      status: 'loading',
+      selectedCity: city,
+      data: null,
+      error: null,
+    }));
     await loadWeather(city, operationId);
   }
 

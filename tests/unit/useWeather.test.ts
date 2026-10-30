@@ -83,7 +83,12 @@ describe('useWeather', () => {
       await pending;
     });
 
-    expect(result.current).toMatchObject({ status: 'success', data: mockWeatherData, error: null });
+    expect(result.current).toMatchObject({
+      status: 'success',
+      data: mockWeatherData,
+      selectedCity: firstCity,
+      error: null,
+    });
   });
 
   it('returns empty without requesting weather when there are no cities', async () => {
@@ -96,8 +101,13 @@ describe('useWeather', () => {
     expect(weatherMock).not.toHaveBeenCalled();
   });
 
-  it('retries the same city search after a geocoding failure', async () => {
-    searchMock.mockRejectedValueOnce(new WeatherServiceError('network', 'Falha de rede.'));
+  it.each([
+    new WeatherServiceError('network', 'Falha de rede.'),
+    new WeatherServiceError('timeout', 'A requisição demorou demais.'),
+    new WeatherServiceError('api'),
+    new WeatherServiceError('invalid-response'),
+  ])('shows the stable search message for a %s geocoding failure and retries it', async (failure) => {
+    searchMock.mockRejectedValueOnce(failure);
     searchMock.mockResolvedValueOnce([firstCity]);
     weatherMock.mockResolvedValue(mockWeatherData);
     const { result } = renderHook(() => useWeather());
@@ -105,7 +115,7 @@ describe('useWeather', () => {
     await act(() => result.current.search('São Paulo'));
     expect(result.current).toMatchObject({
       status: 'error',
-      error: 'Falha de rede.',
+      error: 'Não foi possível buscar cidades. Tente novamente.',
       query: 'São Paulo',
     });
     await act(() => result.current.retry());
@@ -114,25 +124,45 @@ describe('useWeather', () => {
     expect(result.current).toMatchObject({ status: 'success', data: mockWeatherData, error: null });
   });
 
-  it('retries only weather after the automatic first-city request fails', async () => {
+  it.each([
+    new WeatherServiceError('network', 'Falha de rede.'),
+    new WeatherServiceError('timeout', 'A requisição demorou demais.'),
+    new WeatherServiceError('api'),
+    new WeatherServiceError('invalid-response'),
+  ])('shows the stable weather message for a %s forecast failure and retries only weather', async (failure) => {
     searchMock.mockResolvedValue([firstCity, secondCity]);
-    weatherMock.mockRejectedValueOnce(
-      new WeatherServiceError('timeout', 'A requisição demorou demais.'),
-    );
+    weatherMock.mockRejectedValueOnce(failure);
     weatherMock.mockResolvedValueOnce(mockWeatherData);
     const { result } = renderHook(() => useWeather());
 
     await act(() => result.current.search('São Paulo'));
     expect(result.current).toMatchObject({
       status: 'error',
-      error: 'A requisição demorou demais.',
+      error: 'Não foi possível carregar o clima. Tente novamente.',
       cities: [firstCity, secondCity],
+      selectedCity: firstCity,
     });
     await act(() => result.current.retry());
 
     expect(searchMock).toHaveBeenCalledOnce();
     expect(weatherMock).toHaveBeenNthCalledWith(2, firstCity);
     expect(result.current).toMatchObject({ status: 'success', error: null });
+  });
+
+  it('tracks the explicitly selected city while keeping the search results', async () => {
+    searchMock.mockResolvedValue([firstCity, secondCity]);
+    weatherMock.mockResolvedValueOnce(mockWeatherData).mockResolvedValueOnce(secondWeather);
+    const { result } = renderHook(() => useWeather());
+    await act(() => result.current.search('São Paulo'));
+
+    await act(() => result.current.selectCity(secondCity));
+
+    expect(result.current).toMatchObject({
+      status: 'success',
+      selectedCity: secondCity,
+      cities: [firstCity, secondCity],
+      data: secondWeather,
+    });
   });
 
   it('clears old weather during explicit selection and retries the selected city', async () => {
